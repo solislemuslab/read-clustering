@@ -1,0 +1,157 @@
+---
+title: "read_generator"
+author: "Yuke Wu"
+date: "2022-11-09"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+set.seed(500)
+
+# Simulation of a sequence of 4000 nucleotides ####
+seq <-sample(c("a","c","t","g"),prob=c(0.5,0.5,0.5,0.5),4000,replace=T)
+seq
+
+
+
+# List of specific sequences where the enzyme will bind to make the cuts ####
+
+# This sequences are random, but you can change for specific cutting regions
+# according the enzyme to use
+cut_seqs <-list(cut1=sample(c("a","c","t","g"),prob=c(0.5,0.5,0.5,0.5),5,replace=T),
+                cut2=sample(c("a","c","t","g"),prob=c(0.5,0.5,0.5,0.5),5,replace=T),
+                cut3=sample(c("a","c","t","g"),prob=c(0.5,0.5,0.5,0.5),5,replace=T),
+                cut4=sample(c("a","c","t","g"),prob=c(0.5,0.5,0.5,0.5),5,replace=T),
+                cut5=sample(c("a","c","t","g"),prob=c(0.5,0.5,0.5,0.5),5,replace=T)
+)
+
+# as you can see with the first cut sequence, the cut occurs among "a" and "t"
+#seq= ---"t" "g" "a" "t" "c" "c" "g" "a" "a" "a" "g" "a" "c" "c"----
+# ------cut sequence-"t" "c" "c" "g" "a"................................
+
+
+
+# Functions to simulate the cuts ####
+
+# Function that finds the first breakpoint in the sequence ####
+#  this function finds the first breakpoint in "seq" according the cut sequence ("cut_seq")
+# after the indicated position ("pos_start")
+# output: position of the first cut point after the indicated position ("pos_start") 
+
+find_cut_point <-function(seq, cut_seq, pos_start = 1){
+  i <- pos_start
+  len_cut_seq <- length(cut_seq)
+  len_seq <- length(seq)
+  
+  logic <- T
+  while(logic){
+    # Enzymes recognize specific cleavage points with high fidelity, but it is 
+    # possible to bind to a very similar sequence and perform the cleavage.
+    # in this case we assume that it must match perfectl
+    
+    log1 <- (mean(seq[i:(i+len_cut_seq-1)]==cut_seq)>=1)
+    log2 <- (i == (len_seq-len_cut_seq))
+    logic <- !(log1|log2)
+    i=i+1
+  }
+  return(i-1)
+}
+
+
+find_cut_point(seq=seq, cut_seq=cut_seqs$cut1, pos_start = 1)
+
+
+# Function that finds all cut points in the sequence ("seq") where the 
+# cutsequence (cut) is assembled
+# output: vector with all the positions of the cut points in the sequence
+find_all_cut_points <- function(seq,cut_seq){
+  pos <- 0
+  out <- c()
+  logi <- T
+  while(logi){
+    pos <- pos + 1
+    pos <- find_cut_point(seq=seq, cut_seq=cut_seq, pos_start = pos)
+    out <- c(out,pos)
+    logi <- !(pos==(length(seq)-length(cut_seq)))
+    
+    
+  }
+  res <- out[1:(length(out)-1)]
+  return(res)
+}
+
+
+# All the cutpoins form the 5 cutting sequences
+all_cut_poits1 <- find_all_cut_points(seq = seq,cut_seq=cut_seqs$cut1)
+all_cut_poits2 <- find_all_cut_points(seq = seq,cut_seq=cut_seqs$cut2)
+all_cut_poits3 <- find_all_cut_points(seq = seq,cut_seq=cut_seqs$cut3)
+all_cut_poits4 <- find_all_cut_points(seq = seq,cut_seq=cut_seqs$cut4)
+all_cut_poits5 <- find_all_cut_points(seq = seq,cut_seq=cut_seqs$cut5)
+
+
+
+# we assume that for each cut sequence, only 90% of all possible cut points 
+# are made (you can change the number). 
+# This gives us different combinations of cut points
+# and it is stored in list1
+
+
+# output: list of all cut segments
+
+
+
+lista1 <- list()# list of all cut segments
+nx <- 0# counter
+
+for(j in 1:10){
+  step<- j
+  
+  cut_poits1 <- sample(all_cut_poits1, round(length(all_cut_poits1)*0.9))
+  cut_poits2 <- sample(all_cut_poits2, round(length(all_cut_poits2)*0.9))
+  cut_poits3 <- sample(all_cut_poits3, round(length(all_cut_poits3)*0.9))
+  cut_poits4 <- sample(all_cut_poits4, round(length(all_cut_poits4)*0.9))
+  cut_poits5 <- sample(all_cut_poits4, round(length(all_cut_poits4)*0.9))
+  
+  all_cut_points <-sort(c(cut_poits1,cut_poits2,cut_poits3,cut_poits4,cut_poits5))
+  
+  all_cut_points2 <-c(0, all_cut_points, length(seq))
+  
+  n<-length(all_cut_points2)-1
+  seq_log <- (nx+1):(nx+n)
+  
+  for(i in 1:n){
+    seq_1 <- seq[all_cut_points2[i]:all_cut_points2[i+1]]
+    lista1[[seq_log[i]]] <- seq_1
+    nx <- nx+1
+  }
+  
+  names(lista1)[seq_log]<-paste("seq_step",step,1:n,sep="_")
+  
+  
+}
+
+# list of trimmed sequences, from which the original sequence is to be reconstructed
+lista1
+
+# sequence length histogram
+hist(sapply(lista1,FUN=length))
+```
+
+```{r}
+vector <- character(0)
+for(i in 1:190){
+  s <- toString(lista1[i])
+  if (nchar(s) > 1){
+    s <- gsub('^.|.$|,|\"|\n| ', '', s)
+    s <- sub('.', '', s)
+  }
+  print(nchar(s))
+  vector[i] <- s
+}
+length(vector)
+# writeLines(vector, "reads.txt")
+```
